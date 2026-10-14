@@ -18,16 +18,16 @@ COPY seed/ /app/seed/
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Directory for SQLite and runtime data
+# Directory for SQLite and runtime data (allow non-root user on Hugging Face)
 ENV DATA_DIR=/data
-RUN mkdir -p /data
+RUN mkdir -p /data && chmod -R 777 /data
 
-# Default port assigned by PaaS (Render, Koyeb, Railway)
-ENV PORT=20128
-EXPOSE 20128
+# Default port for Hugging Face Spaces is 7860
+ENV PORT=7860
+EXPOSE 7860
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-20128}/health || exit 1
+  CMD curl -f http://localhost:${PORT:-7860}/health || exit 1
 
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
