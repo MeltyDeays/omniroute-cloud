@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: free
     region: oregon
-    healthCheckPath: /health
+    healthCheckPath: /api/monitoring/health
     autoDeploy: true
     envVars:
       - key: STORAGE_ENCRYPTION_KEY

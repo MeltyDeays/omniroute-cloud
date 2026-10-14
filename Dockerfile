@@ -22,12 +22,12 @@ RUN chmod +x /app/entrypoint.sh
 ENV DATA_DIR=/data
 RUN mkdir -p /data && chmod -R 777 /data
 
-# Default port for Hugging Face Spaces is 7860
-ENV PORT=7860
-EXPOSE 7860
+# Default port for Render is 10000 (can be overridden by $PORT)
+ENV PORT=10000
+EXPOSE 10000 7860 20128
 
-# Health check
+# Health check (OmniRoute health route is /api/monitoring/health)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-7860}/health || exit 1
+  CMD curl -f http://localhost:${PORT:-10000}/api/monitoring/health || exit 1
 
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
