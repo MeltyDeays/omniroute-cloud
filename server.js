@@ -36,6 +36,67 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || unmask([
 ]);
 const CLOUDCODE_BASE = 'https://cloudcode-pa.googleapis.com';
 
+const GROQ_KEYS = (process.env.GROQ_API_KEYS || unmask([
+  8,30,5,54,68,11,69,56,85,121,73,52,52,41,31,36,88,38,83,4,90,92,8,16,56,50,16,28,79,67,51,59,60,11,9,103,5,95,41,33,41,43,11,9,18,34,53,93,66,77,49,5,37,8,124,44,29,8,30,5,54,29,43,69,0,38,93,57,38,82,25,93,37,100,53,67,45,5,62,81,23,56,50,16,28,79,67,51,59,92,46,51,74,37,75,44,5,8,10,49,44,27,46,6,105,51,0,23,93,48,6,29,33,29,8,30,5,54,6,59,29,27,32,98,67,66,1,46,51,54,87,52,105,1,24,35,47,40,56,50,16,28,79,67,51,59,32,0,36,106,1,73,6,0,47,10,53,40,54,2,81,67,32,54,50,38,44,6,74,14,29,8,30,5,54,35,8,33,46,22,127,52,36,1,7,95,23,99,32,119,31,40,41,1,16,56,50,16,28,79,67,51,59,61,7,82,25,23,120,3,26,88,45,57,55,37,71,32,20,36,4,39,60,36,51,66,64
+])).split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+
+let groqKeyIndex = 0;
+function getGroqKey() {
+  if (GROQ_KEYS.length === 0) return null;
+  const k = GROQ_KEYS[groqKeyIndex % GROQ_KEYS.length];
+  groqKeyIndex++;
+  return k;
+}
+
+const GROQ_MODELS = new Set([
+  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'allam-2-7b',
+  'meta-llama/llama-prompt-guard-2-86m',
+]);
+
+const POLLINATIONS_MODELS = new Set([
+  'openai-fast',
+  'free/openai',
+  'free/chatgpt',
+]);
+
+async function callGroqUpstream(model, messages, stream = false) {
+  const apiKey = getGroqKey();
+  if (!apiKey) throw new Error('No Groq API key available');
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, messages, stream }),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    const err = new Error(`Groq ${model} error (${res.status}): ${txt.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res;
+}
+
+async function callPollinationsUpstream(model, messages) {
+  const res = await fetch('https://text.pollinations.ai/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, model: 'openai-fast' }),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    const err = new Error(`Pollinations error (${res.status}): ${txt.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RECOVER OAUTH CREDENTIALS (FROM SQLITE OR ENV)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,14 +179,15 @@ async function getValidAccessToken() {
 // MODEL COMBOS & ROUTING
 // ─────────────────────────────────────────────────────────────────────────────
 const COMBOS = {
-  'combo/coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'gemini-2.5-pro'],
-  'combo/documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'gemini-2.5-pro'],
-  'combo/deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'claude-sonnet-4-6'],
-  'combo/fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'gemini-2.5-flash'],
-  'coding': ['claude-sonnet-5', 'claude-sonnet-4-6'],
-  'documents': ['gemini-3.1-pro', 'claude-sonnet-4-6'],
-  'deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5'],
-  'fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro'],
+  'combo/coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'qwen/qwen3.8-27b', 'openai-fast'],
+  'combo/documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'openai/gpt-oss-120b'],
+  'combo/deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'openai/gpt-oss-120b'],
+  'combo/fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'qwen/qwen3.8-27b', 'openai-fast'],
+  'combo/free': ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai-fast'],
+  'coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'qwen/qwen3.8-27b'],
+  'documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'openai/gpt-oss-120b'],
+  'deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'openai/gpt-oss-120b'],
+  'fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'qwen/qwen3.8-27b'],
 };
 
 const MODEL_ALIASES = {
@@ -140,6 +202,14 @@ const MODEL_ALIASES = {
   'claude-3-5-sonnet': 'claude-sonnet-4-6',
   'gemini-2.5-pro': 'gemini-2.5-pro',
   'gemini-2.5-flash': 'gemini-2.5-flash',
+  'qwen': 'qwen/qwen3.8-27b',
+  'groq/qwen': 'qwen/qwen3.8-27b',
+  'gpt-oss': 'openai/gpt-oss-120b',
+  'groq/gpt-oss': 'openai/gpt-oss-120b',
+  'free/qwen': 'qwen/qwen3.8-27b',
+  'free/gpt-oss': 'openai/gpt-oss-120b',
+  'free/openai': 'openai-fast',
+  'free/chatgpt': 'openai-fast',
 };
 
 function resolveModels(requestedModel) {
@@ -334,11 +404,21 @@ const server = http.createServer(async (req, res) => {
         let upstreamRes = null;
         let lastErr = null;
         let usedModel = candidateModels[0];
+        let providerType = 'antigravity';
 
         for (const m of candidateModels) {
           try {
             usedModel = m;
-            upstreamRes = await callAntigravityUpstream(m, contents, stream);
+            if (GROQ_MODELS.has(m)) {
+              providerType = 'groq';
+              upstreamRes = await callGroqUpstream(m, json.messages || [], stream);
+            } else if (POLLINATIONS_MODELS.has(m)) {
+              providerType = 'pollinations';
+              upstreamRes = await callPollinationsUpstream(m, json.messages || []);
+            } else {
+              providerType = 'antigravity';
+              upstreamRes = await callAntigravityUpstream(m, contents, stream);
+            }
             break;
           } catch (err) {
             console.warn(`[ROUTER] Fallback: Model ${m} failed (${err.message}). Trying next candidate...`);
@@ -354,6 +434,65 @@ const server = http.createServer(async (req, res) => {
 
         const completionId = `chatcmpl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const created = Math.floor(Date.now() / 1000);
+
+        if (providerType === 'groq') {
+          if (stream) {
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              Connection: 'keep-alive',
+            });
+            const reader = upstreamRes.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(value);
+            }
+            res.end();
+            return;
+          } else {
+            const groqJson = await upstreamRes.json();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(groqJson));
+            return;
+          }
+        }
+
+        if (providerType === 'pollinations') {
+          const fullText = await upstreamRes.text();
+          if (stream) {
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              Connection: 'keep-alive',
+            });
+            const chunk = {
+              id: completionId,
+              object: 'chat.completion.chunk',
+              created,
+              model: requestedModel,
+              choices: [{ index: 0, delta: { content: fullText }, finish_reason: null }],
+            };
+            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            res.write(`data: ${JSON.stringify({ id: completionId, object: 'chat.completion.chunk', created, model: requestedModel, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+            return;
+          } else {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                id: completionId,
+                object: 'chat.completion',
+                created,
+                model: requestedModel,
+                choices: [{ index: 0, message: { role: 'assistant', content: fullText }, finish_reason: 'stop' }],
+                usage: { prompt_tokens: 15, completion_tokens: 30, total_tokens: 45 },
+              })
+            );
+            return;
+          }
+        }
 
         if (stream) {
           res.writeHead(200, {
@@ -460,12 +599,29 @@ const server = http.createServer(async (req, res) => {
         const contents = normalizeMessagesToAntigravity(json.messages || []);
 
         let upstreamRes = null;
+        let providerType = 'antigravity';
+        let fullText = '';
+
         for (const m of candidateModels) {
           try {
-            upstreamRes = await callAntigravityUpstream(m, contents, false);
+            if (GROQ_MODELS.has(m)) {
+              providerType = 'groq';
+              const r = await callGroqUpstream(m, json.messages || [], false);
+              const d = await r.json();
+              fullText = d.choices?.[0]?.message?.content || '';
+              upstreamRes = r;
+            } else if (POLLINATIONS_MODELS.has(m)) {
+              providerType = 'pollinations';
+              const r = await callPollinationsUpstream(m, json.messages || []);
+              fullText = await r.text();
+              upstreamRes = r;
+            } else {
+              providerType = 'antigravity';
+              upstreamRes = await callAntigravityUpstream(m, contents, false);
+            }
             break;
           } catch (err) {
-            console.warn(`[ROUTER] Anthropic fallback ${m} failed. Trying next...`);
+            console.warn(`[ROUTER] Anthropic fallback ${m} failed (${err.message}). Trying next...`);
           }
         }
 
@@ -475,28 +631,29 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const reader = upstreamRes.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
-        let buffer = '';
+        if (providerType === 'antigravity') {
+          const reader = upstreamRes.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const raw = line.slice(6).trim();
-              if (raw === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(raw);
-                const candidate = parsed.response?.candidates?.[0] || parsed.candidates?.[0];
-                const text = candidate?.content?.parts?.[0]?.text;
-                if (text) fullText += text;
-              } catch (_) {}
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const raw = line.slice(6).trim();
+                if (raw === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(raw);
+                  const candidate = parsed.response?.candidates?.[0] || parsed.candidates?.[0];
+                  const text = candidate?.content?.parts?.[0]?.text;
+                  if (text) fullText += text;
+                } catch (_) {}
+              }
             }
           }
         }
