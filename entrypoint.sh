@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# Disable host-wide PSI contention checks for multi-tenant cloud containers
+export OMNIROUTE_PRESSURE_PSI_DISABLED=true
+export HEAP_PRESSURE_THRESHOLD_MB=${HEAP_PRESSURE_THRESHOLD_MB:-450}
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=400}"
+
 # Ensure data directory exists
 mkdir -p /data
 
