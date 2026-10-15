@@ -12,10 +12,10 @@ services:
       - key: OMNIROUTE_API_KEY
         value: sk-bbe727d4356f358d-e5577d-28c89ab5
       - key: OMNIROUTE_MEMORY_MB
-        value: "400"
+        value: "350"
       - key: NODE_OPTIONS
-        value: "--max-old-space-size=400"
+        value: "--max-old-space-size=350 --optimize-for-size --max-semi-space-size=16"
       - key: HEAP_PRESSURE_THRESHOLD_MB
-        value: "390"
+        value: "340"
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
