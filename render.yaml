@@ -11,15 +11,3 @@ services:
         value: 83d974394c63a347677535f4779ebe5dc9ba1195eecd62e697c2c1c9ac2d9444
       - key: OMNIROUTE_API_KEY
         value: sk-bbe727d4356f358d-e5577d-28c89ab5
-      - key: OMNIROUTE_MEMORY_MB
-        value: "280"
-      - key: NODE_OPTIONS
-        value: "--max-old-space-size=280"
-      - key: HEAP_PRESSURE_THRESHOLD_MB
-        value: "260"
-      - key: NEXT_TELEMETRY_DISABLED
-        value: "1"
-      - key: ARENA_ELO_SYNC_ENABLED
-        value: "false"
-      - key: HOT_RELOAD_ENABLED
-        value: "false"

@@ -1,14 +1,13 @@
 {
   "name": "omniroute-cloud",
   "version": "1.0.0",
-  "description": "OmniRoute AI Gateway - Cloud Deployment",
-  "main": "index.js",
+  "description": "OmniRoute AI Micro-Gateway - Ultra Lightweight Cloud Deployment",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "omniroute serve --no-open"
+    "start": "node server.js"
   },
-  "dependencies": {
-    "omniroute": "^3.8.48"
-  },
+  "dependencies": {},
   "engines": {
     "node": ">=22.0.0"
   }
