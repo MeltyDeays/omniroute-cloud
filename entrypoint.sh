@@ -2,11 +2,10 @@
 set -e
 
 # Memory tuning for Render 512MB free tier container (single process mode)
-# App baseline ~330MB live. 384MB heap gives ~54MB GC headroom.
-# RSS estimate: 384 + ~80 native ≈ 464MB, under 512MB container limit.
-export OMNIROUTE_MEMORY_MB=384
-export NODE_OPTIONS="--max-old-space-size=384"
-export HEAP_PRESSURE_THRESHOLD_MB=370
+# 280MB heap + ~178MB native/Next.js overhead ≈ 458MB RSS (safe under 512MB limit)
+export OMNIROUTE_MEMORY_MB=280
+export NODE_OPTIONS="--max-old-space-size=280"
+export HEAP_PRESSURE_THRESHOLD_MB=260
 export NEXT_TELEMETRY_DISABLED=1
 
 # Disable memory-hungry background subsystems
