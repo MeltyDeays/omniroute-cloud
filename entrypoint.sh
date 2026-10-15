@@ -1,10 +1,11 @@
 #!/bin/sh
 set -e
 
-# Disable host-wide PSI contention checks for multi-tenant cloud containers
-export OMNIROUTE_PRESSURE_PSI_DISABLED=true
-export HEAP_PRESSURE_THRESHOLD_MB=${HEAP_PRESSURE_THRESHOLD_MB:-450}
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=400}"
+# Memory tuning for Render 512MB free tier container
+export OMNIROUTE_MEMORY_MB=256
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=256}"
+export HEAP_PRESSURE_THRESHOLD_MB=250
+export NEXT_TELEMETRY_DISABLED=1
 
 # Ensure data directory exists
 mkdir -p /data

@@ -24,9 +24,10 @@ RUN mkdir -p /data && chmod -R 777 /data
 
 # Default port for Render is 10000 (can be overridden by $PORT)
 ENV PORT=10000
-ENV OMNIROUTE_PRESSURE_PSI_DISABLED=true
-ENV HEAP_PRESSURE_THRESHOLD_MB=450
-ENV NODE_OPTIONS="--max-old-space-size=400"
+ENV OMNIROUTE_MEMORY_MB=256
+ENV NODE_OPTIONS="--max-old-space-size=256"
+ENV HEAP_PRESSURE_THRESHOLD_MB=250
+ENV NEXT_TELEMETRY_DISABLED=1
 EXPOSE 10000 7860 20128
 
 # Health check (OmniRoute health route is /api/monitoring/health)
