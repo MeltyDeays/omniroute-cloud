@@ -30,5 +30,18 @@ fi
 
 chmod -R 777 /data
 
-echo "Starting OmniRoute on port ${PORT:-10000}..."
-exec omniroute serve --port "${PORT:-10000}" --no-open
+PORT="${PORT:-10000}"
+export PORT
+export OMNIROUTE_PORT="$PORT"
+export DASHBOARD_PORT="$PORT"
+export API_PORT="$PORT"
+export HOSTNAME="0.0.0.0"
+export NODE_ENV="production"
+
+SERVER_FILE="/usr/local/lib/node_modules/omniroute/dist/server-ws.mjs"
+if [ ! -f "$SERVER_FILE" ]; then
+  SERVER_FILE="/usr/local/lib/node_modules/omniroute/dist/server.js"
+fi
+
+echo "Starting OmniRoute standalone (single process) on port $PORT..."
+exec node "$SERVER_FILE"
