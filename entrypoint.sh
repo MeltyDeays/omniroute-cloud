@@ -2,9 +2,9 @@
 set -e
 
 # Memory tuning for Render 512MB free tier container
-export OMNIROUTE_MEMORY_MB=256
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=256}"
-export HEAP_PRESSURE_THRESHOLD_MB=250
+export OMNIROUTE_MEMORY_MB=320
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=320}"
+export HEAP_PRESSURE_THRESHOLD_MB=310
 export NEXT_TELEMETRY_DISABLED=1
 
 # Ensure data directory exists
