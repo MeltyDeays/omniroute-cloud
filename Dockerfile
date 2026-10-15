@@ -25,7 +25,7 @@ RUN mkdir -p /data && chmod -R 777 /data
 # Default port for Render is 10000 (can be overridden by $PORT)
 ENV PORT=10000
 ENV OMNIROUTE_MEMORY_MB=350
-ENV NODE_OPTIONS="--max-old-space-size=350 --optimize-for-size --max-semi-space-size=16"
+ENV NODE_OPTIONS="--max-old-space-size=350"
 ENV HEAP_PRESSURE_THRESHOLD_MB=340
 ENV NEXT_TELEMETRY_DISABLED=1
 EXPOSE 10000 7860 20128

@@ -14,7 +14,7 @@ services:
       - key: OMNIROUTE_MEMORY_MB
         value: "350"
       - key: NODE_OPTIONS
-        value: "--max-old-space-size=350 --optimize-for-size --max-semi-space-size=16"
+        value: "--max-old-space-size=350"
       - key: HEAP_PRESSURE_THRESHOLD_MB
         value: "340"
       - key: NEXT_TELEMETRY_DISABLED
