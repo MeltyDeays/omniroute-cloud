@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install omniroute
-RUN npm install -g omniroute@latest
+# Install stable omniroute (3.8.48 without the 3.8.51 cgroup_ratio shed bug)
+RUN npm install -g omniroute@3.8.48
 
 # Copy pre-configured seed database (combos, models, settings)
 COPY seed/ /app/seed/
