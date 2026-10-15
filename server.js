@@ -62,16 +62,22 @@ const POLLINATIONS_MODELS = new Set([
   'free/chatgpt',
 ]);
 
-async function callGroqUpstream(model, messages, stream = false) {
+async function callGroqUpstream(model, messages, stream = false, maxTokens = null) {
   const apiKey = getGroqKey();
   if (!apiKey) throw new Error('No Groq API key available');
+  const payload = {
+    model,
+    messages,
+    stream,
+    max_tokens: maxTokens || 1024,
+  };
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, messages, stream }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const txt = await res.text();
@@ -411,7 +417,7 @@ const server = http.createServer(async (req, res) => {
             usedModel = m;
             if (GROQ_MODELS.has(m)) {
               providerType = 'groq';
-              upstreamRes = await callGroqUpstream(m, json.messages || [], stream);
+              upstreamRes = await callGroqUpstream(m, json.messages || [], stream, json.max_tokens || json.max_completion_tokens);
             } else if (POLLINATIONS_MODELS.has(m)) {
               providerType = 'pollinations';
               upstreamRes = await callPollinationsUpstream(m, json.messages || []);
@@ -606,7 +612,7 @@ const server = http.createServer(async (req, res) => {
           try {
             if (GROQ_MODELS.has(m)) {
               providerType = 'groq';
-              const r = await callGroqUpstream(m, json.messages || [], false);
+              const r = await callGroqUpstream(m, json.messages || [], false, json.max_tokens || 1024);
               const d = await r.json();
               fullText = d.choices?.[0]?.message?.content || '';
               upstreamRes = r;
