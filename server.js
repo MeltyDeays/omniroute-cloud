@@ -62,6 +62,54 @@ const POLLINATIONS_MODELS = new Set([
   'free/chatgpt',
 ]);
 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || unmask([
+  28,6,67,6,0,66,3,69,72,31,22,22,1,92,80,87,26,78,8,90,14,93,11,74,92,19,68,83,73,20,76,86,93,8,86,78,65,3,9,8,90,89,64,87,71,16,84,27,22,68,84,14,88,90,75,16,5,92,14,13,15,67,90,68,76,0,24,73,76,7,92,12,82
+]);
+
+const OPENROUTER_MODELS = new Set([
+  'openrouter/free',
+  'openrouter/auto',
+  'openrouter/google/gemma-4-31b-it:free',
+  'openrouter/nvidia/nemotron-3.5-lightning:free',
+  'openrouter/minimax/minimax-m3.1-flash:free',
+  'openrouter/poolside/laguna-s-2.1:free',
+]);
+
+function isOpenRouterModel(model) {
+  return model.startsWith('openrouter/') || model.includes(':free') || OPENROUTER_MODELS.has(model);
+}
+
+async function callOpenRouterUpstream(model, messages, stream = false, maxTokens = null) {
+  if (!OPENROUTER_API_KEY) throw new Error('No OpenRouter API key available');
+  let targetModel = model;
+  if (targetModel.startsWith('openrouter/') && targetModel !== 'openrouter/free' && targetModel !== 'openrouter/auto') {
+    targetModel = targetModel.slice('openrouter/'.length);
+  }
+  const payload = {
+    model: targetModel,
+    messages,
+    stream,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+  };
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      'HTTP-Referer': 'https://omniroute.ai',
+      'X-Title': 'OmniRoute Cloud Gateway',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    const err = new Error(`OpenRouter ${targetModel} error (${res.status}): ${txt.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res;
+}
+
 async function callGroqUpstream(model, messages, stream = false, maxTokens = null) {
   const apiKey = getGroqKey();
   if (!apiKey) throw new Error('No Groq API key available');
@@ -185,15 +233,15 @@ async function getValidAccessToken() {
 // MODEL COMBOS & ROUTING
 // ─────────────────────────────────────────────────────────────────────────────
 const COMBOS = {
-  'combo/coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'qwen/qwen3.8-27b', 'openai-fast'],
-  'combo/documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'openai/gpt-oss-120b'],
-  'combo/deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'openai/gpt-oss-120b'],
-  'combo/fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'qwen/qwen3.8-27b', 'openai-fast'],
-  'combo/free': ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai-fast'],
-  'coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'qwen/qwen3.8-27b'],
-  'documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'openai/gpt-oss-120b'],
-  'deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'openai/gpt-oss-120b'],
-  'fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'qwen/qwen3.8-27b'],
+  'combo/coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'openrouter/free', 'qwen/qwen3.8-27b', 'openai-fast'],
+  'combo/documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'openrouter/free', 'openai/gpt-oss-120b', 'openai-fast'],
+  'combo/deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'openrouter/free', 'openai/gpt-oss-120b'],
+  'combo/fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'openrouter/free', 'qwen/qwen3.8-27b', 'openai-fast'],
+  'combo/free': ['openrouter/free', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai-fast'],
+  'coding': ['claude-sonnet-5', 'claude-sonnet-4-6', 'openrouter/free', 'qwen/qwen3.8-27b'],
+  'documents': ['gemini-3.1-pro', 'claude-sonnet-4-6', 'openrouter/free', 'openai/gpt-oss-120b'],
+  'deep-reasoning': ['claude-opus-4-6-thinking', 'claude-sonnet-5', 'openrouter/free', 'openai/gpt-oss-120b'],
+  'fast-review': ['claude-sonnet-4-6', 'gemini-3.1-pro', 'openrouter/free', 'qwen/qwen3.8-27b'],
 };
 
 const MODEL_ALIASES = {
@@ -216,6 +264,8 @@ const MODEL_ALIASES = {
   'free/gpt-oss': 'openai/gpt-oss-120b',
   'free/openai': 'openai-fast',
   'free/chatgpt': 'openai-fast',
+  'openrouter': 'openrouter/free',
+  'or/free': 'openrouter/free',
 };
 
 function resolveModels(requestedModel) {
@@ -372,6 +422,8 @@ const server = http.createServer(async (req, res) => {
     const allModels = [
       ...Object.keys(COMBOS),
       ...Object.keys(MODEL_ALIASES),
+      'openrouter/free',
+      'openrouter/auto',
       'antigravity/claude-sonnet-5',
       'antigravity/claude-opus-4-6-thinking',
       'antigravity/claude-sonnet-4-6',
@@ -418,6 +470,9 @@ const server = http.createServer(async (req, res) => {
             if (GROQ_MODELS.has(m)) {
               providerType = 'groq';
               upstreamRes = await callGroqUpstream(m, json.messages || [], stream, json.max_tokens || json.max_completion_tokens);
+            } else if (isOpenRouterModel(m)) {
+              providerType = 'openrouter';
+              upstreamRes = await callOpenRouterUpstream(m, json.messages || [], stream, json.max_tokens || json.max_completion_tokens);
             } else if (POLLINATIONS_MODELS.has(m)) {
               providerType = 'pollinations';
               upstreamRes = await callPollinationsUpstream(m, json.messages || []);
@@ -441,7 +496,7 @@ const server = http.createServer(async (req, res) => {
         const completionId = `chatcmpl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const created = Math.floor(Date.now() / 1000);
 
-        if (providerType === 'groq') {
+        if (providerType === 'groq' || providerType === 'openrouter') {
           if (stream) {
             res.writeHead(200, {
               'Content-Type': 'text/event-stream',
@@ -457,9 +512,9 @@ const server = http.createServer(async (req, res) => {
             res.end();
             return;
           } else {
-            const groqJson = await upstreamRes.json();
+            const outJson = await upstreamRes.json();
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(groqJson));
+            res.end(JSON.stringify(outJson));
             return;
           }
         }
@@ -613,6 +668,12 @@ const server = http.createServer(async (req, res) => {
             if (GROQ_MODELS.has(m)) {
               providerType = 'groq';
               const r = await callGroqUpstream(m, json.messages || [], false, json.max_tokens || 1024);
+              const d = await r.json();
+              fullText = d.choices?.[0]?.message?.content || '';
+              upstreamRes = r;
+            } else if (isOpenRouterModel(m)) {
+              providerType = 'openrouter';
+              const r = await callOpenRouterUpstream(m, json.messages || [], false, json.max_tokens || 1024);
               const d = await r.json();
               fullText = d.choices?.[0]?.message?.content || '';
               upstreamRes = r;
